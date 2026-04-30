@@ -1,78 +1,60 @@
-// Main App component with page routing
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LandingPage from './components/LandingPage';
 import HomePage from './components/HomePage';
-import SearchLibraries from './components/SearchLibraries';
-import Quiz from './components/Quiz';
-import Results from './components/Results';
 import './App.css';
 
-// Page types
 const PAGES = {
   LANDING: 'landing',
   HOME: 'home',
-  SEARCH_LIBRARIES: 'searchLibraries',
-  QUIZ: 'quiz',
-  RESULTS: 'results'
 };
+
+const THEME_KEY = 'anime4u-theme';
+
+function getInitialTheme() {
+  if (typeof window === 'undefined') {
+    return 'dark';
+  }
+
+  const storedTheme = window.localStorage.getItem(THEME_KEY);
+  if (storedTheme === 'dark' || storedTheme === 'light') {
+    return storedTheme;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark';
+}
 
 function App() {
   const [currentPage, setCurrentPage] = useState(PAGES.LANDING);
-  const [recommendations, setRecommendations] = useState([]);
+  const [theme, setTheme] = useState(getInitialTheme);
 
-  const goToHome = () => {
-    setCurrentPage(PAGES.HOME);
-  };
-
-  const goToSearchLibraries = () => {
-    setCurrentPage(PAGES.SEARCH_LIBRARIES);
-  };
-
-  const goToQuiz = () => {
-    setCurrentPage(PAGES.QUIZ);
-  };
-
-  const handleResults = (results) => {
-    setRecommendations(results);
-    setCurrentPage(PAGES.RESULTS);
-  };
-
-  const handleBack = () => {
-    setRecommendations([]);
-    setCurrentPage(PAGES.HOME);
-  };
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   return (
-    <div>
+    <div className="app-shell">
       {currentPage === PAGES.LANDING && (
-        <LandingPage onStart={goToHome} />
+        <LandingPage
+          onStart={() => setCurrentPage(PAGES.HOME)}
+          theme={theme}
+          onToggleTheme={() => {
+            setTheme((currentTheme) => {
+              return currentTheme === 'dark' ? 'light' : 'dark';
+            });
+          }}
+        />
       )}
-
       {currentPage === PAGES.HOME && (
-        <HomePage 
-          onSearchLibraries={goToSearchLibraries} 
-          onQuiz={goToQuiz} 
-        />
-      )}
-
-      {currentPage === PAGES.SEARCH_LIBRARIES && (
-        <SearchLibraries 
-          onResults={handleResults} 
-          onBack={handleBack} 
-        />
-      )}
-
-      {currentPage === PAGES.QUIZ && (
-        <Quiz 
-          onResults={handleResults} 
-          onBack={handleBack} 
-        />
-      )}
-
-      {currentPage === PAGES.RESULTS && (
-        <Results 
-          recommendations={recommendations} 
-          onBack={handleBack} 
+        <HomePage
+          theme={theme}
+          onToggleTheme={() => {
+            setTheme((currentTheme) => {
+              return currentTheme === 'dark' ? 'light' : 'dark';
+            });
+          }}
         />
       )}
     </div>

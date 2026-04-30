@@ -1,11 +1,12 @@
-// Quiz component - 10 question quiz to get anime recommendations
+// Quiz component - Quiz with multiple genre selections
 import { useState } from 'react';
-import { fetchAnimeByQuizFilters, fetchTopAnime, getRecommendations } from '../services/animeApi';
+import { fetchTopAnime, fetchAnimeByGenre, getRecommendations } from '../services/animeApi';
 
+// Quiz questions - first question allows multiple selections
 const quizQuestions = [
   {
     number: 1,
-    question: "What genre do you prefer most?",
+    question: "What genres do you prefer? (Select all that apply)",
     options: [
       { label: "Action", value: "1" },
       { label: "Adventure", value: "2" },
@@ -17,7 +18,8 @@ const quizQuestions = [
       { label: "Sci-Fi", value: "24" },
       { label: "Slice of Life", value: "36" },
       { label: "Sports", value: "30" }
-    ]
+    ],
+    multiple: true
   },
   {
     number: 2,
@@ -25,21 +27,12 @@ const quizQuestions = [
     options: [
       { label: "Short (1-12 eps)", value: "short" },
       { label: "Medium (13-26 eps)", value: "medium" },
-      { label: "Long (27+ eps)", value: "long" }
+      { label: "Long (27+ eps)", value: "long" },
+      { label: "No preference", value: "any" }
     ]
   },
   {
     number: 3,
-    question: "Which era do you prefer?",
-    options: [
-      { label: "Classic (pre-2000)", value: "classic" },
-      { label: "Old School (2000-2010)", value: "old-school" },
-      { label: "Modern (2011-2020)", value: "modern" },
-      { label: "Recent (2021+)", value: "recent" }
-    ]
-  },
-  {
-    number: 4,
     question: "What kind of protagonist do you like?",
     options: [
       { label: "Male lead", value: "male" },
@@ -48,16 +41,17 @@ const quizQuestions = [
     ]
   },
   {
-    number: 5,
+    number: 4,
     question: "How much action do you want?",
     options: [
-      { label: "Lots of action", value: "high" },
-      { label: "Some action", value: "medium" },
-      { label: "Mostly dialogue/character-driven", value: "low" }
+      { label: "Lots of action", value: "action" },
+      { label: "Some action", value: "some" },
+      { label: "Mostly dialogue/character-driven", value: "drama" },
+      { label: "No preference", value: "any" }
     ]
   },
   {
-    number: 6,
+    number: 5,
     question: "What is the ideal anime rating (score)?",
     options: [
       { label: "High (8+)", value: "8" },
@@ -66,7 +60,7 @@ const quizQuestions = [
     ]
   },
   {
-    number: 7,
+    number: 6,
     question: "Do you want mature themes or family-friendly?",
     options: [
       { label: "Mature (seinen/josei)", value: "r" },
@@ -75,7 +69,7 @@ const quizQuestions = [
     ]
   },
   {
-    number: 8,
+    number: 7,
     question: "Sub vs Dub?",
     options: [
       { label: "Sub only", value: "sub" },
@@ -84,21 +78,12 @@ const quizQuestions = [
     ]
   },
   {
-    number: 9,
-    question: "What kind of art style?",
-    options: [
-      { label: "Modern (2015+)", value: "modern" },
-      { label: "Retro (pre-2010)", value: "retro" },
-      { label: "Classic (pre-2000)", value: "classic" }
-    ]
-  },
-  {
-    number: 10,
+    number: 8,
     question: "Do you prefer popular series or hidden gems?",
     options: [
-      { label: "Very popular (top 100)", value: "top100" },
-      { label: "Popular (top 1000)", value: "top1000" },
-      { label: "Hidden gems (less known)", value: "gems" }
+      { label: "Very popular", value: "popular" },
+      { label: "Hidden gems", value: "gems" },
+      { label: "No preference", value: "any" }
     ]
   }
 ];
@@ -108,11 +93,25 @@ function Quiz({ onResults, onBack }) {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
+  // Handle single selection
   const handleAnswer = (value) => {
     setAnswers({
       ...answers,
       [currentQuestion]: value
+    });
+  };
+
+  // Handle multiple selection (for question 1)
+  const handleMultipleAnswer = (value) => {
+    const current = answers[0] || [];
+    const newSelection = current.includes(value)
+      ? current.filter(v => v !== value)
+      : [...current, value];
+    setAnswers({
+      ...answers,
+      [0]: newSelection
     });
   };
 
@@ -128,74 +127,6 @@ function Quiz({ onResults, onBack }) {
     }
   };
 
-  const buildFilters = () => {
-    const filters = {};
-    
-    // Question 1: Genre
-    if (answers[0]) {
-      filters.genreId = answers[0];
-    }
-    
-    // Question 2: Anime length (filter client-side)
-    const lengthPref = answers[1];
-    
-    // Question 3: Era
-    const era = answers[2];
-    if (era === 'classic') {
-      filters.startDate = '1980-01-01';
-      filters.endDate = '1999-12-31';
-    } else if (era === 'old-school') {
-      filters.startDate = '2000-01-01';
-      filters.endDate = '2010-12-31';
-    } else if (era === 'modern') {
-      filters.startDate = '2011-01-01';
-      filters.endDate = '2020-12-31';
-    } else if (era === 'recent') {
-      filters.startDate = '2021-01-01';
-    }
-    
-    // Question 4: Protagonist (add as keyword)
-    if (answers[3] && answers[3] !== 'any') {
-      filters.keyword = answers[3] + ' protagonist';
-    }
-    
-    // Question 6: Score
-    if (answers[5] && answers[5] !== '0') {
-      filters.minScore = answers[5];
-    }
-    
-    // Question 7: Rating
-    if (answers[6] && answers[6] !== 'any') {
-      filters.rating = answers[6];
-    }
-    
-    // Question 9: Art style (similar to era)
-    const artStyle = answers[8];
-    if (artStyle === 'modern' && !filters.startDate) {
-      filters.startDate = '2015-01-01';
-    } else if (artStyle === 'retro' && !filters.startDate) {
-      filters.startDate = '1990-01-01';
-      filters.endDate = '2009-12-31';
-    } else if (artStyle === 'classic' && !filters.startDate) {
-      filters.endDate = '1999-12-31';
-    }
-    
-    // Question 10: Popularity
-    const popularity = answers[9];
-    if (popularity === 'top100') {
-      filters.orderBy = 'popularity';
-      filters.offset = 0;
-    } else if (popularity === 'top1000') {
-      filters.orderBy = 'popularity';
-      filters.offset = 100;
-    } else if (popularity === 'gems') {
-      filters.orderBy = 'score';
-      filters.offset = 500;
-    }
-    
-    return { filters, lengthPref };
-  };
-
   const filterByLength = (animeList, lengthPref) => {
     if (!lengthPref || lengthPref === 'any') return animeList;
     
@@ -208,47 +139,121 @@ function Quiz({ onResults, onBack }) {
     });
   };
 
+  // Helper to get fallback
+  const getFallback = async () => {
+    setLoadingMessage('Loading popular anime...');
+    try {
+      const list = await fetchTopAnime(50);
+      if (list && list.length > 0) {
+        return getRecommendations(list, 10);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   const handleGetRecommendations = async () => {
     setLoading(true);
     setError(null);
+    setLoadingMessage('Finding your anime recommendations...');
     
     try {
-      const { filters, lengthPref } = buildFilters();
-      
       let animeList = [];
       
-      // Try to fetch with filters
-      if (Object.keys(filters).length > 0) {
-        try {
-          animeList = await fetchAnimeByQuizFilters(filters);
-} catch {
-          // Fallback to top anime if filter fails
-          animeList = await fetchTopAnime();
+      // Get answers
+      const genreIds = answers[0] || [];
+      const lengthPref = answers[1];
+      const minScore = answers[4];
+      
+      console.log('Genre IDs selected:', genreIds);
+      console.log('Length preference:', lengthPref);
+      console.log('Min score:', minScore);
+      
+      // Build search based on preferences
+      if (genreIds.length > 0) {
+        // Multiple genres selected - fetch by first genre
+        setLoadingMessage(`Loading ${quizQuestions[0].options.find(o => o.value === genreIds[0])?.label || 'anime'}...`);
+        console.log('Fetching by genre:', genreIds[0]);
+        animeList = await fetchAnimeByGenre(parseInt(genreIds[0]), 50);
+        
+        // Also fetch from additional genres and combine
+        for (let i = 1; i < Math.min(genreIds.length, 3); i++) {
+          try {
+            setLoadingMessage(`Loading more ${quizQuestions[0].options.find(o => o.value === genreIds[i])?.label || 'anime'}...`);
+            console.log('Fetching additional genre:', genreIds[i]);
+            const more = await fetchAnimeByGenre(parseInt(genreIds[i]), 30);
+            animeList = [...animeList, ...more];
+          } catch (e) {
+            console.log('Failed to fetch genre:', genreIds[i], e);
+          }
         }
       } else {
-        // No filters, get top anime
-        animeList = await fetchTopAnime();
+        // Default to top anime
+        setLoadingMessage('Loading popular anime...');
+        console.log('Fetching top anime...');
+        animeList = await fetchTopAnime(50);
       }
       
-      // Filter by length if specified
-      animeList = filterByLength(animeList, lengthPref);
+      console.log('Got results:', animeList?.length);
       
-      const recommendations = getRecommendations(animeList);
-      onResults(recommendations);
+      // Check for valid results
+      if (!animeList || !Array.isArray(animeList) || animeList.length === 0) {
+        console.log('No results, trying fallback...');
+        setLoadingMessage('Trying fallback...');
+        animeList = await fetchTopAnime(50);
+      }
+      
+      // Filter by length
+      if (lengthPref && lengthPref !== 'any') {
+        animeList = filterByLength(animeList, lengthPref);
+      }
+      
+      // Filter by score if specified
+      if (minScore && minScore !== '0') {
+        const scoreVal = parseInt(minScore);
+        animeList = animeList.filter(anime => anime.score && anime.score >= scoreVal);
+      }
+      
+      // Get recommendations
+      const recommendations = getRecommendations(animeList, 10);
+      
+      console.log('Recommendations:', recommendations?.length);
+      
+      if (recommendations && recommendations.length > 0) {
+        onResults(recommendations);
+      } else {
+        setLoadingMessage('Trying fallback...');
+        const fallback = await getFallback();
+        if (fallback.length > 0) {
+          onResults(fallback);
+        } else {
+          setError('No recommendations found. Please try again.');
+        }
+      }
     } catch (err) {
-      setError(err.message);
+      console.error('Quiz error:', err);
+      setLoadingMessage('Trying fallback...');
+      const fallback = await getFallback();
+      if (fallback.length > 0) {
+        onResults(fallback);
+      } else {
+        setError('Failed to load. Please try again.');
+      }
     } finally {
       setLoading(false);
+      setLoadingMessage('');
     }
   };
 
   const question = quizQuestions[currentQuestion];
-  const allAnswered = Object.keys(answers).length === quizQuestions.length;
+  const someAnswered = Object.keys(answers).length >= 1;
 
   if (loading) {
     return (
       <div>
-        <p>Loading...</p>
+        <h1>Quiz</h1>
+        <p>{loadingMessage || 'Loading...'}</p>
         <button onClick={onBack}>Back</button>
       </div>
     );
@@ -260,7 +265,7 @@ function Quiz({ onResults, onBack }) {
       
       {error && (
         <div>
-          <p>Failed to load. Please try again.</p>
+          <p>{error}</p>
           <button onClick={handleGetRecommendations}>Retry</button>
         </div>
       )}
@@ -275,16 +280,27 @@ function Quiz({ onResults, onBack }) {
           <div>
             {question.options.map((option, index) => (
               <div key={index}>
-                <label>
-                  <input
-                    type="radio"
-                    name={`q${question.number}`}
-                    value={option.value}
-                    checked={answers[currentQuestion] === option.value}
-                    onChange={() => handleAnswer(option.value)}
-                  />
-                  {option.label}
-                </label>
+                {question.multiple ? (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={(answers[0] || []).includes(option.value)}
+                      onChange={() => handleMultipleAnswer(option.value)}
+                    />
+                    {option.label}
+                  </label>
+                ) : (
+                  <label>
+                    <input
+                      type="radio"
+                      name={`q${question.number}`}
+                      value={option.value}
+                      checked={answers[currentQuestion] === option.value}
+                      onChange={() => handleAnswer(option.value)}
+                    />
+                    {option.label}
+                  </label>
+                )}
               </div>
             ))}
           </div>
@@ -299,7 +315,7 @@ function Quiz({ onResults, onBack }) {
             ) : (
               <button 
                 onClick={handleGetRecommendations} 
-                disabled={!allAnswered}
+                disabled={!someAnswered}
               >
                 Get Recommendations
               </button>
