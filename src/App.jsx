@@ -1,122 +1,82 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// Main App component with page routing
+import { useState } from 'react';
+import LandingPage from './components/LandingPage';
+import HomePage from './components/HomePage';
+import SearchLibraries from './components/SearchLibraries';
+import Quiz from './components/Quiz';
+import Results from './components/Results';
+import './App.css';
+
+// Page types
+const PAGES = {
+  LANDING: 'landing',
+  HOME: 'home',
+  SEARCH_LIBRARIES: 'searchLibraries',
+  QUIZ: 'quiz',
+  RESULTS: 'results'
+};
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(PAGES.LANDING);
+  const [recommendations, setRecommendations] = useState([]);
+
+  const goToHome = () => {
+    setCurrentPage(PAGES.HOME);
+  };
+
+  const goToSearchLibraries = () => {
+    setCurrentPage(PAGES.SEARCH_LIBRARIES);
+  };
+
+  const goToQuiz = () => {
+    setCurrentPage(PAGES.QUIZ);
+  };
+
+  const handleResults = (results) => {
+    setRecommendations(results);
+    setCurrentPage(PAGES.RESULTS);
+  };
+
+  const handleBack = () => {
+    setRecommendations([]);
+    setCurrentPage(PAGES.HOME);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div>
+      {currentPage === PAGES.LANDING && (
+        <LandingPage onStart={goToHome} />
+      )}
 
-      <div className="ticks"></div>
+      {currentPage === PAGES.HOME && (
+        <HomePage 
+          onSearchLibraries={goToSearchLibraries} 
+          onQuiz={goToQuiz} 
+        />
+      )}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {currentPage === PAGES.SEARCH_LIBRARIES && (
+        <SearchLibraries 
+          onResults={handleResults} 
+          onBack={handleBack} 
+        />
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {currentPage === PAGES.QUIZ && (
+        <Quiz 
+          onResults={handleResults} 
+          onBack={handleBack} 
+        />
+      )}
+
+      {currentPage === PAGES.RESULTS && (
+        <Results 
+          recommendations={recommendations} 
+          onBack={handleBack} 
+        />
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
