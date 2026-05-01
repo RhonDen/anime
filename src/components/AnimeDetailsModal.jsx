@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  AUDIO_AVAILABILITY_NOTE,
-  fetchAnimeDetails,
-} from '../services/animeApi';
+import { fetchAnimeDetails } from '../services/animeApi';
 import {
   countLinkedSeasons,
   formatEpisodeText,
@@ -86,10 +83,6 @@ function AnimeDetailsModal({ anime, onClose }) {
     {
       label: 'Rating',
       value: activeAnime.rating,
-    },
-    {
-      label: 'Audio',
-      value: AUDIO_AVAILABILITY_NOTE,
     },
     {
       label: 'Members',

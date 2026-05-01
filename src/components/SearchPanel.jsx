@@ -1,5 +1,3 @@
-import { AUDIO_AVAILABILITY_NOTE } from '../services/animeApi';
-
 const TYPE_OPTIONS = [
   { value: '', label: 'Any type' },
   { value: 'tv', label: 'TV' },
@@ -144,16 +142,7 @@ function SearchPanel({
               <option value="asc">Ascending</option>
             </select>
           </label>
-
-          <label className="search-panel__field">
-            <span>Audio</span>
-            <select disabled value="unsupported" onChange={() => undefined}>
-              <option value="unsupported">Dub/sub unavailable from Jikan</option>
-            </select>
-          </label>
         </div>
-
-        <p className="search-panel__hint">Audio filter note: {AUDIO_AVAILABILITY_NOTE}</p>
 
         <div className="search-panel__actions">
           <button type="submit" className="button" disabled={isLoading}>

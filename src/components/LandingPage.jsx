@@ -1,6 +1,6 @@
 import ThemeToggle from './ThemeToggle';
 
-function LandingPage({ onStart, theme, onToggleTheme }) {
+function LandingPage({ onOpenQuiz, onStart, theme, onToggleTheme }) {
   return (
     <main className="landing">
       <header className="topbar">
@@ -11,30 +11,34 @@ function LandingPage({ onStart, theme, onToggleTheme }) {
       <section className="landing__hero">
         <div className="landing__copy">
           <p className="section-kicker">Your Netflix-style anime recommender</p>
-          <h1>Anime discovery with smarter filters, quick hover info, and dark mode built in.</h1>
+          <h1>Anime discovery with full browse rows, sharper filters, and a cleaner quiz flow.</h1>
           <p className="landing__lead">
-            Browse curated rows, search by genre and year, then click any title for
-            richer anime details and streaming links.
+            Browse full 100-title rows with arrow controls, search by genre and year,
+            then open a dedicated recommendation quiz page when you want something
+            more tailored than a quick filter pass.
           </p>
           <div className="landing__actions">
             <button type="button" className="button" onClick={onStart}>
-              Get Started
+              Start Browsing
+            </button>
+            <button type="button" className="button button--ghost" onClick={onOpenQuiz}>
+              Open Quiz Page
             </button>
           </div>
         </div>
 
         <div className="landing__panel">
           <div className="landing__feature">
-            <strong>Hover for quick info</strong>
-            <p>Use the question mark on each card to preview synopsis, season, and episodes.</p>
+            <strong>Page through real rows</strong>
+            <p>Browse beyond the first screen with arrow-driven row navigation instead of static grids.</p>
           </div>
           <div className="landing__feature">
-            <strong>Click for full anime details</strong>
-            <p>Open a focused modal with production info, linked seasons, and external links.</p>
+            <strong>Dedicated quiz page</strong>
+            <p>Use multi-select genres, multiple eras, and character-type questions in a cleaner flow.</p>
           </div>
           <div className="landing__feature">
-            <strong>Search with filters</strong>
-            <p>Mix title, genre, year, type, status, and sort order with Jikan-powered results.</p>
+            <strong>Search with live refresh</strong>
+            <p>Active search results and browse rows can resync while the site stays open.</p>
           </div>
         </div>
       </section>

@@ -1,76 +1,15 @@
+import {
+  QUIZ_ERA_FILTERS,
+  QUIZ_LENGTH_FILTERS,
+  QUIZ_MOOD_TAGS,
+  QUIZ_PROTAGONIST_TAGS,
+  QUIZ_SETTING_TAGS,
+} from '../utils/quizPreferences';
+
 const BASE_URL = 'https://api.jikan.moe/v4';
 const MAX_PAGE_SIZE = 25;
-const MIN_REQUEST_INTERVAL = 350;
-const QUIZ_FETCH_LIMIT = 50;
-
-export const AUDIO_AVAILABILITY_NOTE =
-  'Dub/sub availability is not provided by Jikan.';
-
-const QUIZ_GENRES = {
-  action: 1,
-  romance: 22,
-  comedy: 4,
-  fantasy: 10,
-  horror: 14,
-};
-
-const LENGTH_FILTERS = {
-  short: {
-    params: {
-      max_episodes: 11,
-    },
-    rarity: 2,
-  },
-  medium: {
-    params: {
-      min_episodes: 13,
-      max_episodes: 26,
-    },
-    rarity: 1,
-  },
-  long: {
-    params: {
-      min_episodes: 27,
-    },
-    rarity: 2,
-  },
-};
-
-const ERA_FILTERS = {
-  classic: {
-    params: {
-      end_date: '1999-12-31',
-    },
-    rarity: 4,
-  },
-  modern: {
-    params: {
-      start_date: '2000-01-01',
-      end_date: '2015-12-31',
-    },
-    rarity: 2,
-  },
-  recent: {
-    params: {
-      start_date: '2016-01-01',
-      end_date: '2025-12-31',
-    },
-    rarity: 1,
-  },
-  future: {
-    params: {
-      start_date: '2026-01-01',
-    },
-    rarity: 5,
-  },
-};
-
-const MOOD_TAGS = {
-  exciting: ['Action', 'Adventure', 'Super Power', 'Sports', 'Sci-Fi', 'Mecha'],
-  relaxing: ['Slice of Life', 'Iyashikei', 'Gourmet', 'Music'],
-  dark: ['Horror', 'Suspense', 'Psychological', 'Drama', 'Thriller'],
-  wholesome: ['Comedy', 'Romance', 'Slice of Life', 'School', 'Family'],
-};
+const MIN_REQUEST_INTERVAL = 100;
+const QUIZ_FETCH_LIMIT = 60;
 
 let lastRequestStartedAt = 0;
 let requestQueue = Promise.resolve();
@@ -299,28 +238,177 @@ function uniqueAnimeByFranchise(animeList) {
   });
 }
 
-function getMoodMatchCount(anime, mood) {
-  const moodTags = MOOD_TAGS[mood];
+function getAnimeTagNames(anime) {
+  return [
+    ...(anime.genres || []),
+    ...(anime.themes || []),
+    ...(anime.demographics || []),
+    ...(anime.explicitGenres || []),
+  ]
+    .map((entry) => entry?.name)
+    .filter(Boolean);
+}
 
-  if (!moodTags) {
+function getTagMatchCount(anime, preferredTags) {
+  if (!preferredTags?.length) {
     return 0;
   }
 
-  const tagNames = [...(anime.genres || []), ...(anime.themes || [])]
-    .map((entry) => entry?.name)
-    .filter(Boolean);
+  const tagNames = getAnimeTagNames(anime);
 
-  return tagNames.filter((name) => moodTags.includes(name)).length;
+  return preferredTags.filter((tagName) => tagNames.includes(tagName)).length;
+}
+
+function getGenreMatchCount(anime, selectedGenres) {
+  if (!selectedGenres?.length) {
+    return 0;
+  }
+
+  const selectedGenreIds = new Set(
+    selectedGenres
+      .map((genreId) => Number(genreId))
+      .filter((genreId) => Number.isFinite(genreId)),
+  );
+
+  if (selectedGenreIds.size === 0) {
+    return 0;
+  }
+
+  return [
+    ...(anime.genres || []),
+    ...(anime.themes || []),
+    ...(anime.demographics || []),
+    ...(anime.explicitGenres || []),
+  ].filter((entry) => selectedGenreIds.has(entry?.mal_id)).length;
+}
+
+function matchesEraKey(animeYear, eraKey) {
+  const eraFilter = QUIZ_ERA_FILTERS[eraKey];
+
+  if (!eraFilter || !animeYear) {
+    return false;
+  }
+
+  const startYear = eraFilter.params.start_date
+    ? Number(eraFilter.params.start_date.slice(0, 4))
+    : null;
+  const endYear = eraFilter.params.end_date
+    ? Number(eraFilter.params.end_date.slice(0, 4))
+    : null;
+
+  if (startYear !== null && animeYear < startYear) {
+    return false;
+  }
+
+  if (endYear !== null && animeYear > endYear) {
+    return false;
+  }
+
+  return true;
+}
+
+function getEraMatchCount(anime, selectedEras) {
+  if (!selectedEras?.length) {
+    return 0;
+  }
+
+  const animeYear = anime.year ?? anime.aired?.prop?.from?.year ?? null;
+
+  return selectedEras.filter((eraKey) => matchesEraKey(animeYear, eraKey)).length;
+}
+
+function matchesLengthPreference(anime, lengthPreference) {
+  const episodeCount = anime.episodes ?? 0;
+
+  if (lengthPreference === 'short') {
+    return episodeCount >= 1 && episodeCount <= 12;
+  }
+
+  if (lengthPreference === 'medium') {
+    return episodeCount >= 13 && episodeCount <= 26;
+  }
+
+  if (lengthPreference === 'long') {
+    return episodeCount >= 27;
+  }
+
+  return false;
+}
+
+function matchesStatusPreference(anime, statusPreference) {
+  const normalizedStatus = anime.status?.toLowerCase() || '';
+
+  if (statusPreference === 'complete') {
+    return normalizedStatus.includes('finished') || normalizedStatus.includes('complete');
+  }
+
+  if (statusPreference === 'airing') {
+    return normalizedStatus.includes('airing');
+  }
+
+  if (statusPreference === 'upcoming') {
+    return normalizedStatus.includes('not yet') || normalizedStatus.includes('upcoming');
+  }
+
+  return false;
+}
+
+function getQuizPreferenceScore(anime, answers) {
+  let preferenceScore = (anime.score ?? 0) * 0.45;
+
+  preferenceScore += getGenreMatchCount(anime, answers.genres) * 8;
+  preferenceScore += getEraMatchCount(anime, answers.eras) * 5;
+  preferenceScore += getTagMatchCount(anime, QUIZ_MOOD_TAGS[answers.mood]) * 4;
+  preferenceScore += getTagMatchCount(anime, QUIZ_PROTAGONIST_TAGS[answers.protagonist]) * 4;
+  preferenceScore += getTagMatchCount(anime, QUIZ_SETTING_TAGS[answers.setting]) * 3;
+
+  if (answers.length !== 'any' && matchesLengthPreference(anime, answers.length)) {
+    preferenceScore += 2.5;
+  }
+
+  if (answers.type !== 'any' && anime.type?.toLowerCase() === answers.type) {
+    preferenceScore += 2;
+  }
+
+  if (answers.status !== 'any' && matchesStatusPreference(anime, answers.status)) {
+    preferenceScore += 2;
+  }
+
+  return preferenceScore;
+}
+
+function comparePopularityPreference(firstAnime, secondAnime, popularityPreference) {
+  const firstPopularity = firstAnime.popularity ?? Number.MAX_SAFE_INTEGER;
+  const secondPopularity = secondAnime.popularity ?? Number.MAX_SAFE_INTEGER;
+
+  if (popularityPreference === 'hidden') {
+    return secondPopularity - firstPopularity;
+  }
+
+  if (popularityPreference === 'mainstream') {
+    return firstPopularity - secondPopularity;
+  }
+
+  return 0;
 }
 
 function rankQuizResults(animeList, answers) {
   return [...animeList].sort((firstAnime, secondAnime) => {
-    const moodDifference =
-      getMoodMatchCount(secondAnime, answers.mood) -
-      getMoodMatchCount(firstAnime, answers.mood);
+    const firstPreferenceScore = getQuizPreferenceScore(firstAnime, answers);
+    const secondPreferenceScore = getQuizPreferenceScore(secondAnime, answers);
 
-    if (moodDifference !== 0) {
-      return moodDifference;
+    if (secondPreferenceScore !== firstPreferenceScore) {
+      return secondPreferenceScore - firstPreferenceScore;
+    }
+
+    const popularityDifference = comparePopularityPreference(
+      firstAnime,
+      secondAnime,
+      answers.popularity,
+    );
+
+    if (popularityDifference !== 0) {
+      return popularityDifference;
     }
 
     const firstScore = firstAnime.score ?? 0;
@@ -333,59 +421,59 @@ function rankQuizResults(animeList, answers) {
     const firstPopularity = firstAnime.popularity ?? Number.MAX_SAFE_INTEGER;
     const secondPopularity = secondAnime.popularity ?? Number.MAX_SAFE_INTEGER;
 
-    if (answers.popularity === 'hidden') {
-      return secondPopularity - firstPopularity;
-    }
-
-    if (answers.popularity === 'mainstream') {
-      return firstPopularity - secondPopularity;
-    }
-
     return firstPopularity - secondPopularity;
   });
 }
 
-function buildQuizQuery(answers, omittedFilter = null) {
+function buildQuizQueryParams(answers, options = {}) {
   const queryParams = {
-    genres: QUIZ_GENRES[answers.genre],
     order_by: 'score',
     sort: 'desc',
     sfw: true,
   };
-  const appliedFilters = [];
 
-  const lengthFilter = LENGTH_FILTERS[answers.length];
-  if (lengthFilter && omittedFilter !== 'length') {
-    Object.assign(queryParams, lengthFilter.params);
-    appliedFilters.push({
-      key: 'length',
-      rarity: lengthFilter.rarity,
-    });
+  if (!options.omitGenres && answers.genres?.length > 0) {
+    queryParams.genres = answers.genres.join(',');
   }
 
-  const eraFilter = ERA_FILTERS[answers.era];
-  if (eraFilter && omittedFilter !== 'era') {
-    Object.assign(queryParams, eraFilter.params);
-    appliedFilters.push({
-      key: 'era',
-      rarity: eraFilter.rarity,
-    });
+  if (!options.omitType && answers.type && answers.type !== 'any') {
+    queryParams.type = answers.type;
   }
 
-  return {
-    queryParams,
-    appliedFilters,
-  };
+  if (!options.omitStatus && answers.status && answers.status !== 'any') {
+    queryParams.status = answers.status;
+  }
+
+  if (!options.omitLength) {
+    const lengthFilter = QUIZ_LENGTH_FILTERS[answers.length];
+
+    if (lengthFilter) {
+      Object.assign(queryParams, lengthFilter.params);
+    }
+  }
+
+  return queryParams;
 }
 
-function getRarestFilter(appliedFilters) {
-  if (appliedFilters.length === 0) {
-    return null;
+async function fetchQuizMatches(answers, options = {}) {
+  const selectedEras = !options.omitEras && answers.eras?.length > 0
+    ? answers.eras
+    : [null];
+  const limitPerEra = Math.max(15, Math.ceil(QUIZ_FETCH_LIMIT / selectedEras.length));
+  const baseQueryParams = buildQuizQueryParams(answers, options);
+  const combinedMatches = [];
+
+  for (const eraKey of selectedEras) {
+    const eraQueryParams = eraKey ? QUIZ_ERA_FILTERS[eraKey]?.params || {} : {};
+    const matches = await safeFetchPagedAnimeList('/anime', limitPerEra, {
+      ...baseQueryParams,
+      ...eraQueryParams,
+    });
+
+    combinedMatches.push(...matches);
   }
 
-  return [...appliedFilters].sort((firstFilter, secondFilter) => {
-    return secondFilter.rarity - firstFilter.rarity;
-  })[0].key;
+  return uniqueAnime(combinedMatches);
 }
 
 async function fetchTopFallback(limit) {
@@ -519,43 +607,36 @@ export async function fetchTopRated2026(limit = 10) {
   return cacheList('top-rated-2026', animeList).slice(0, limit);
 }
 
-export async function fetchQuizRecommendations(answers, fallbackLimit = 5) {
-  const strictQuery = buildQuizQuery(answers);
-  const strictMatches = await safeFetchPagedAnimeList(
-    '/anime',
-    QUIZ_FETCH_LIMIT,
-    strictQuery.queryParams,
-  );
-  const rankedStrictMatches = uniqueAnimeByFranchise(
-    rankQuizResults(strictMatches, answers),
-  );
-
-  if (rankedStrictMatches.length >= fallbackLimit) {
-    return rankedStrictMatches.slice(0, fallbackLimit);
-  }
-
-  const rarestFilter = getRarestFilter(strictQuery.appliedFilters);
-  const relaxedMatches = rarestFilter
-    ? await safeFetchPagedAnimeList(
-        '/anime',
-        QUIZ_FETCH_LIMIT,
-        buildQuizQuery(answers, rarestFilter).queryParams,
-      )
+export async function fetchQuizRecommendations(answers, fallbackLimit = 8) {
+  const strictMatches = await fetchQuizMatches(answers);
+  const relaxedMatches = strictMatches.length < fallbackLimit
+    ? await fetchQuizMatches(answers, {
+        omitLength: true,
+        omitStatus: true,
+        omitType: true,
+      })
     : [];
-
-  const rankedRelaxedMatches = rankQuizResults(relaxedMatches, answers);
+  const strictAndRelaxedMatches = uniqueAnime([...strictMatches, ...relaxedMatches]);
+  const broadMatches = strictAndRelaxedMatches.length < fallbackLimit
+    ? await fetchQuizMatches(answers, {
+        omitEras: true,
+        omitLength: true,
+        omitStatus: true,
+        omitType: true,
+      })
+    : [];
   const combinedMatches = uniqueAnimeByFranchise(
-    uniqueAnime([...rankedStrictMatches, ...rankedRelaxedMatches]),
+    uniqueAnime([...strictMatches, ...relaxedMatches, ...broadMatches]),
   );
 
   if (combinedMatches.length >= fallbackLimit) {
-    return combinedMatches.slice(0, fallbackLimit);
+    return rankQuizResults(combinedMatches, answers).slice(0, fallbackLimit);
   }
 
-  const topFallback = await fetchTopFallback(fallbackLimit);
+  const topFallback = await fetchTopFallback(Math.max(fallbackLimit, 20));
   const finalRecommendations = uniqueAnimeByFranchise(
     uniqueAnime([...combinedMatches, ...topFallback]),
   );
 
-  return finalRecommendations.slice(0, fallbackLimit);
+  return rankQuizResults(finalRecommendations, answers).slice(0, fallbackLimit);
 }

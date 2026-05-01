@@ -270,10 +270,9 @@ function Quiz({ onResults, onBack }) {
         </div>
       )}
       
-      {!error && (
+{!error && (
         <>
           <div>
-            <p>Question {question.number} of {quizQuestions.length}</p>
             <p>{question.question}</p>
           </div>
           
